@@ -39,7 +39,7 @@ def extract_e_pretrained(
             inputs = processor(
                 audio, sampling_rate=16000, return_tensors="pt"
             )
-            input_features = inputs.input_features.to(device)
+            input_features = inputs.input_features.to(device=device, dtype=model.dtype)
             enc_out = model.get_encoder()(input_features).last_hidden_state
             encoder_outputs.append(enc_out.cpu())
 
