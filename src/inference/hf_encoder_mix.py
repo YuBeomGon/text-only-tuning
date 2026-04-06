@@ -1,7 +1,9 @@
 import torch
 from pathlib import Path
 
-import librosa
+import numpy as np
+import soundfile as sf
+import scipy.signal
 from transformers import WhisperProcessor, WhisperForConditionalGeneration
 from transformers.modeling_outputs import BaseModelOutput
 
@@ -45,7 +47,13 @@ def transcribe_single(
     device: str = "cuda",
 ) -> str:
     """Transcribe a single audio file. Model/processor/prior must be pre-loaded."""
-    audio, sr = librosa.load(audio_path, sr=16000)
+    audio, sr = sf.read(audio_path, dtype="float32")
+    if audio.ndim > 1:
+        audio = audio.mean(axis=1)  # stereo -> mono
+    if sr != 16000:
+        num_samples = int(len(audio) * 16000 / sr)
+        audio = scipy.signal.resample(audio, num_samples)
+        sr = 16000
     inputs = processor(audio, sampling_rate=16000, return_tensors="pt")
     input_features = inputs.input_features.to(device)
 

@@ -1,0 +1,12 @@
+{
+  "cer": 1.0,
+  "wer": 1.0,
+  "domain_term_recall": 0.0,
+  "hallucination_rate": 1.0,
+  "timestamp_error": 0.0,
+  "latency_ms": 118.0,
+  "n_samples": 1,
+  "alpha": 1.0,
+  "model_name": "openai/whisper-tiny",
+  "prior_path": "none"
+}
