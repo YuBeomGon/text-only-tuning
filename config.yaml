@@ -1,0 +1,79 @@
+run:
+  run_id: exp_insurance_alpha07_fixedprior_v1
+  seed: 42
+  output_dir: outputs/runs/exp_insurance_alpha07_fixedprior_v1
+  save_raw_predictions: true
+  save_metrics_json: true
+
+domain:
+  name: insurance_callcenter
+  language: en
+  lexicon_path: data/lexicons/insurance_terms.txt
+
+datasets:
+  eval:
+    in_domain_clean: data/eval/insurance_clean.jsonl
+    in_domain_hard: data/eval/insurance_hard.jsonl
+    out_of_domain_sanity: data/eval/general_sanity.jsonl
+
+serving:
+  implementation: faster_whisper_interp
+  model_path: models/faster-whisper-large-v3
+  batch_size: 8
+  word_timestamps: true
+  condition_on_previous_text: false
+  hotwords: null
+  decode:
+    beam_size: 5
+    best_of: 5
+    patience: 1.0
+    length_penalty: 1.0
+    repetition_penalty: 1.0
+    no_repeat_ngram_size: 0
+    temperatures: [0.0]
+    compression_ratio_threshold: 2.4
+    log_prob_threshold: -1.0
+    no_speech_threshold: 0.6
+
+prior:
+  enabled: true
+  mode: fixed
+  prior_id: insurance_prior_v1
+  prior_path: priors/insurance_prior_v1.npy
+  alpha: 0.7
+  normalize_before_mix: false
+  enforce_shape_match: true
+  reuse_mixed_for_alignment: true
+  alpha_equals_one_is_baseline: true
+
+train:
+  enabled: false
+  entrypoint: src/train/train_text_only.py
+  max_steps: 1000
+  warmup_steps: 200
+  eval_every_steps: 50
+  save_every_steps: 50
+  learning_rate: 1.0e-4
+  loss:
+    ce_weight: 1.0
+    kl_weight: 0.0
+    domain_term_penalty_weight: 0.0
+
+eval:
+  entrypoint: src/eval/run_eval.py
+  metrics:
+    - wer
+    - domain_term_recall
+    - domain_term_precision
+    - hallucination_rate
+    - timestamp_error
+    - latency_ms
+    - rtf
+    - gpu_mem_mb
+
+score_gate:
+  cer_rel_pass: 0.03
+  term_recall_rel_pass: 0.05
+  hallucination_abs_max: 0.01
+  timestamp_rel_max: 0.05
+  latency_rel_max: 0.10
