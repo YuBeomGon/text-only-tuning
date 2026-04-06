@@ -33,7 +33,7 @@ def compute_term_recall(
     return hits / expected
 
 
-## Hallucination detection
+## Hallucination detection (broadcast pattern only)
 
 HALLUCINATION_PATTERNS = [
     # 방송 멘트
@@ -65,81 +65,28 @@ HALLUCINATION_PATTERNS = [
     "오늘 영상은 여기까지",
 ]
 
-# Korean speech: typical 3-5 chars/sec. Above this threshold = suspicious.
-CHARS_PER_SEC_THRESHOLD = 10.0
 
-# Repeated trigram threshold
-REPEAT_NGRAM_N = 3
-REPEAT_NGRAM_MAX = 3
-
-
-def detect_hallucination(
-    hypothesis: str,
-    duration_sec: float | None = None,
-) -> dict:
-    """Detect hallucination signals in a hypothesis.
+def detect_hallucination(hypothesis: str) -> dict:
+    """Detect hallucination by checking for known broadcast patterns.
 
     Returns dict with:
-      - pattern_match: bool (known hallucination phrase found)
-      - length_anomaly: bool (too many chars per second of audio)
-      - repetition: bool (repeated n-grams detected)
-      - is_hallucination: bool (any signal triggered)
+      - is_hallucination: bool
       - matched_patterns: list[str]
     """
     hyp = hypothesis.strip()
-    result = {
-        "pattern_match": False,
-        "length_anomaly": False,
-        "repetition": False,
-        "is_hallucination": False,
-        "matched_patterns": [],
+    matched = [p for p in HALLUCINATION_PATTERNS if p in hyp]
+    return {
+        "is_hallucination": len(matched) > 0,
+        "matched_patterns": matched,
     }
 
-    # 1. Pattern matching
-    for pattern in HALLUCINATION_PATTERNS:
-        if pattern in hyp:
-            result["pattern_match"] = True
-            result["matched_patterns"].append(pattern)
 
-    # 2. Length anomaly (chars per second)
-    if duration_sec and duration_sec > 0:
-        cps = len(hyp) / duration_sec
-        if cps > CHARS_PER_SEC_THRESHOLD:
-            result["length_anomaly"] = True
-
-    # 3. Repetition detection (n-gram)
-    words = hyp.split()
-    if len(words) >= REPEAT_NGRAM_N:
-        ngram_counts: dict[tuple, int] = {}
-        for i in range(len(words) - REPEAT_NGRAM_N + 1):
-            ng = tuple(words[i : i + REPEAT_NGRAM_N])
-            ngram_counts[ng] = ngram_counts.get(ng, 0) + 1
-        for ng, count in ngram_counts.items():
-            if count >= REPEAT_NGRAM_MAX:
-                result["repetition"] = True
-                break
-
-    result["is_hallucination"] = (
-        result["pattern_match"]
-        or result["length_anomaly"]
-        or result["repetition"]
-    )
-    return result
-
-
-def compute_hallucination_rate(
-    hypotheses: list[str],
-    durations: list[float | None],
-) -> float:
-    """Compute hallucination rate over a list of hypotheses.
-
-    Returns: fraction of utterances flagged as hallucination.
-    """
+def compute_hallucination_rate(hypotheses: list[str]) -> float:
+    """Compute hallucination rate: fraction of utterances containing broadcast patterns."""
     if not hypotheses:
         return 0.0
     flags = sum(
-        1
-        for hyp, dur in zip(hypotheses, durations)
-        if detect_hallucination(hyp, dur)["is_hallucination"]
+        1 for hyp in hypotheses
+        if detect_hallucination(hyp)["is_hallucination"]
     )
     return flags / len(hypotheses)

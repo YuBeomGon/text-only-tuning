@@ -62,13 +62,11 @@ def run_eval(
 
     all_refs = []
     all_hyps = []
-    all_durations = []
     latencies = []
 
     for item in items:
         audio_path = item["audio_path"]
         reference = item["text"]
-        duration_sec = item.get("duration_sec")
 
         t0 = time.time()
         hypothesis = transcribe_single(
@@ -78,7 +76,6 @@ def run_eval(
 
         all_refs.append(reference)
         all_hyps.append(hypothesis)
-        all_durations.append(duration_sec)
         latencies.append(elapsed_ms)
 
     # Corpus-level CER/WER (total edit distance / total reference length)
@@ -91,8 +88,8 @@ def run_eval(
         for r, h in zip(all_refs, all_hyps)
     ) / len(all_refs)
 
-    # Hallucination: pattern + length anomaly + repetition
-    hall_rate = compute_hallucination_rate(all_hyps, all_durations)
+    # Hallucination: broadcast pattern detection only
+    hall_rate = compute_hallucination_rate(all_hyps)
     avg_latency = sum(latencies) / len(latencies)
 
     metrics = {
