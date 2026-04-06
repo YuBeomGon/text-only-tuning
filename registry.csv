@@ -1,1 +1,1 @@
-run_id,date,git_sha,config_name,phase,domain,alpha,prior_id,train_ckpt,eval_set,wer,domain_term_recall,domain_term_precision,hallucination_rate,timestamp_error,latency_ms,rtf,gpu_mem_mb,score,decision,status,notes
+run_id,date,git_sha,config_name,phase,domain,alpha,prior_id,train_ckpt,eval_set,cer,wer,domain_term_recall,domain_term_precision,hallucination_rate,timestamp_error,latency_ms,rtf,gpu_mem_mb,score_decision,status,notes

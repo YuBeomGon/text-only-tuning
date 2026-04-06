@@ -1,0 +1,42 @@
+# auto_policy.yaml — machine-readable automation policy
+# The leader agent must only generate experiments within these constraints.
+
+current_phase: 0
+
+phase_config:
+  0:
+    goal: baseline_lock_and_plumbing
+    steps:
+      - baseline eval with alpha=1.0
+      - verify alpha=1.0 reproduces baseline exactly
+      - verify B shape matches inference path
+      - verify alpha<1.0 decode runs without crash
+    auto_generate_next: false
+    phase_transition_requires_human: true
+  1:
+    goal: text_only_b_training
+    allowed_steps: [100, 300, 1000]
+    loss: ce_only
+    auto_generate_next: true
+    phase_transition_requires_human: true
+  2:
+    goal: hf_inference_interpolation
+    allowed_alphas: [0.9, 0.7, 0.5]
+    auto_generate_next: true
+    phase_transition_requires_human: true
+  3:
+    goal: loss_ablation
+    ablation_order: [ce, ce_kl, ce_kl_term]
+    auto_generate_next: true
+    phase_transition_requires_human: true
+  4:
+    goal: robustness
+    auto_generate_next: false
+    phase_transition_requires_human: true
+
+loop_control:
+  initial_human_review_count: 5
+  max_consecutive_fails: 3
+
+score_thresholds_provisional: true
+score_thresholds_note: "Calibrate after Phase 0 baseline variance measurement (2-3 runs)"

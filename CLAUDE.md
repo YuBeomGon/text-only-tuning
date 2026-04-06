@@ -9,6 +9,7 @@
 - **run.sh**: 실험 실행 메인 엔트리포인트. config를 받아 run_id 생성, run_once.sh → score.sh 순서 호출.
 - **run_once.sh**: 실제 한 번의 deterministic run 수행. 훈련/eval 실행 후 metrics.json과 raw output 생성.
 - **state.md**: 현재 프로젝트 상태 메모. best run, 남은 리스크, 다음 액션을 leader가 추적하는 용도.
+- **auto_policy.yaml**: machine-readable automation policy. Defines current phase, allowed parameters, phase transition rules, loop control.
 
 ## Working mode
 - Work as a single leader coordinating sequential subagents.

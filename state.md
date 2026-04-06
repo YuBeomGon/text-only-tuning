@@ -1,41 +1,46 @@
 # state.md
 
 ## Current phase
-- Phase: baseline / fixed-prior sweep / tuned-prior eval
+- Phase: 0 (baseline_lock_and_plumbing)
 - Owner: leader
-- Last updated: YYYY-MM-DD
+- Last updated: 2026-04-06
 
 ## Current goal
-Validate whether `encoder_output` interpolation with a domain prior improves domain ASR while keeping faster-whisper serving practical.
+Lock baseline metrics and validate interpolation plumbing.
 
-## Current baseline
+## Baseline (Phase 0 frozen, never changes)
 - model:
 - eval set:
+- CER:
 - WER:
 - domain term recall:
 - hallucination rate:
 - timestamp error:
-- latency RTF:
+- latency ms:
 
-## Best current run
+## Current best (updated only on PASS or reproduced REPRO_REQUIRED)
 - run_id:
 - config:
 - alpha:
 - prior_id:
+- CER:
+- WER:
+- domain term recall:
 - why it won:
 - known regressions:
 
 ## Open risks
 - short-utterance hallucination
-- timestamp mismatch between decode and alignment
-- batch vs single-path divergence
+- batch vs single-path divergence (serving transition)
 - out-of-domain over-bias
-- serving latency increase
+- score thresholds are provisional (calibrate after Phase 0)
 
 ## Decisions made
-- encoder_output interpolation is treated as a proxy, not paper-faithful K/V interpolation
-- single-path, batched-path, and word timestamp alignment must use the same mixed representation
-- no promotion without fresh eval evidence and registry update
+- encoder_output interpolation is a proxy, not paper-faithful K/V interpolation
+- B-only training (decoder freeze), conservative v1 choice
+- HF Whisper for research eval, faster-whisper for serving (separate work)
+- Score gate compares candidate vs baseline (viability) then vs current_best (promotion)
+- No git revert on FAIL
 
 ## Next 3 actions
 1.
@@ -43,13 +48,8 @@ Validate whether `encoder_output` interpolation with a domain prior improves dom
 3.
 
 ## Blockers
-- 
-- 
+-
 
 ## Notes
 - Keep this file short and operational.
-- After each completed run, update:
-  - current phase
-  - best current run
-  - open risks
-  - next 3 actions
+- After each completed run, update: current phase, current best, open risks, next 3 actions.
