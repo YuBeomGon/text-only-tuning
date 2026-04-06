@@ -10,7 +10,9 @@ import argparse
 from pathlib import Path
 
 import torch
-import librosa
+import numpy as np
+import soundfile as sf
+import scipy.signal
 from transformers import WhisperProcessor, WhisperForConditionalGeneration
 
 
@@ -27,7 +29,13 @@ def extract_e_pretrained(
     encoder_outputs = []
     with torch.no_grad():
         for audio_path in audio_paths:
-            audio, sr = librosa.load(str(audio_path), sr=16000)
+            audio, sr = sf.read(str(audio_path), dtype="float32")
+            if audio.ndim > 1:
+                audio = audio.mean(axis=1)
+            if sr != 16000:
+                num_samples = int(len(audio) * 16000 / sr)
+                audio = scipy.signal.resample(audio, num_samples)
+                sr = 16000
             inputs = processor(
                 audio, sampling_rate=16000, return_tensors="pt"
             )
