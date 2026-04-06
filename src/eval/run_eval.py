@@ -62,11 +62,13 @@ def run_eval(
 
     all_refs = []
     all_hyps = []
+    all_durations = []
     latencies = []
 
     for item in items:
         audio_path = item["audio_path"]
         reference = item["text"]
+        duration_sec = item.get("duration_sec")
 
         t0 = time.time()
         hypothesis = transcribe_single(
@@ -76,27 +78,28 @@ def run_eval(
 
         all_refs.append(reference)
         all_hyps.append(hypothesis)
+        all_durations.append(duration_sec)
         latencies.append(elapsed_ms)
 
     # Corpus-level CER/WER (total edit distance / total reference length)
     corpus_cer = jiwer_cer(all_refs, all_hyps)
     corpus_wer = jiwer_wer(all_refs, all_hyps)
 
-    # Per-utterance average for term recall and hallucination
+    # Per-utterance average for term recall
     total_term_recall = sum(
         compute_term_recall(r, h, domain_terms)
         for r, h in zip(all_refs, all_hyps)
     ) / len(all_refs)
-    total_hallucination = sum(
-        compute_hallucination_rate(r, h) for r, h in zip(all_refs, all_hyps)
-    ) / len(all_refs)
+
+    # Hallucination: pattern + length anomaly + repetition
+    hall_rate = compute_hallucination_rate(all_hyps, all_durations)
     avg_latency = sum(latencies) / len(latencies)
 
     metrics = {
         "cer": round(corpus_cer, 6),
         "wer": round(corpus_wer, 6),
         "domain_term_recall": round(total_term_recall, 6),
-        "hallucination_rate": round(total_hallucination, 6),
+        "hallucination_rate": round(hall_rate, 6),
         "timestamp_error": 0.0,
         "latency_ms": round(avg_latency, 2),
         "n_samples": len(items),
