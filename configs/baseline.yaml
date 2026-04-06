@@ -1,0 +1,23 @@
+# configs/baseline.yaml
+run:
+  run_id: baseline_v1
+  seed: 42
+  save_raw_predictions: true
+  save_metrics_json: true
+
+domain:
+  name: insurance_callcenter
+  language: ko
+  lexicon_path: data/lexicon/domain_terms.txt
+
+datasets:
+  eval:
+    in_domain_clean: data/processed/eval_v1/manifest.jsonl
+
+serving:
+  model_path: openai/whisper-base
+
+prior:
+  enabled: false
+  prior_path: ""
+  alpha: 1.0
