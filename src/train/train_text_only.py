@@ -54,15 +54,17 @@ def train(
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
 
-    # Load model, freeze everything
-    model = WhisperForConditionalGeneration.from_pretrained(model_name)
+    # Load model in fp32 for stable training, freeze everything
+    model = WhisperForConditionalGeneration.from_pretrained(
+        model_name, torch_dtype=torch.float32
+    )
     model = model.to(device)
     for param in model.parameters():
         param.requires_grad = False
 
-    # Load E_pretrained and create trainable B
+    # Load E_pretrained and create trainable B (fp32)
     e_pretrained = torch.load(e_pretrained_path, map_location=device)
-    B = nn.Parameter(e_pretrained.clone().squeeze(0))  # (seq_len, d_model)
+    B = nn.Parameter(e_pretrained.clone().squeeze(0).float())  # (seq_len, d_model)
 
     # Load text data
     with open(text_file, "r", encoding="utf-8") as f:

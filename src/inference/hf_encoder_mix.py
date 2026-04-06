@@ -55,13 +55,14 @@ def transcribe_single(
         audio = scipy.signal.resample(audio, num_samples)
         sr = 16000
     inputs = processor(audio, sampling_rate=16000, return_tensors="pt")
-    input_features = inputs.input_features.to(device)
+    input_features = inputs.input_features.to(device=device, dtype=model.dtype)
 
     with torch.no_grad():
         encoder_output = model.get_encoder()(input_features).last_hidden_state
 
         if prior is not None and alpha < 1.0:
-            encoder_output = mix_encoder_output(encoder_output, prior, alpha)
+            prior_matched = prior.to(dtype=encoder_output.dtype)
+            encoder_output = mix_encoder_output(encoder_output, prior_matched, alpha)
 
         encoder_outputs = BaseModelOutput(last_hidden_state=encoder_output)
 

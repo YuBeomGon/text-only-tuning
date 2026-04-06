@@ -1,0 +1,23 @@
+# Data (sensitive)
+data/
+!data/.gitkeep
+
+# Model weights & priors
+priors/*.pt
+priors/**/*.pt
+
+# Experiment outputs
+experiments/outputs/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# IDE
+.vscode/
+.idea/
+
+# Claude Code
+.claude/
