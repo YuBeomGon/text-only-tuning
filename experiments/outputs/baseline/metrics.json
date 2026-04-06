@@ -1,0 +1,12 @@
+{
+  "cer": 0.128522,
+  "wer": 0.355155,
+  "domain_term_recall": 0.852226,
+  "hallucination_rate": 0.0,
+  "timestamp_error": 0.0,
+  "latency_ms": 177.23,
+  "n_samples": 1512,
+  "alpha": 1.0,
+  "model_name": "openai/whisper-large-v3-turbo",
+  "prior_path": "none"
+}

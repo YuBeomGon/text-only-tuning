@@ -15,7 +15,7 @@ datasets:
     in_domain_clean: data/processed/eval_v1/manifest.jsonl
 
 serving:
-  model_path: openai/whisper-base
+  model_path: openai/whisper-large-v3-turbo
 
 prior:
   enabled: false
