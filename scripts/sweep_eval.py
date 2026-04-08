@@ -29,6 +29,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--ckpt_dir", required=True)
     parser.add_argument("--alphas", nargs="+", type=float, default=[0.9, 0.7, 0.5])
+    parser.add_argument("--step_interval", type=int, default=100,
+                        help="Evaluate every N steps (default: 100)")
     parser.add_argument("--model_name", default="openai/whisper-large-v3-turbo")
     parser.add_argument("--manifest", default="data/processed/eval_v1/manifest.jsonl")
     parser.add_argument("--lexicon", default="data/lexicon/domain_terms.txt")
@@ -38,6 +40,7 @@ def main():
     args = parser.parse_args()
 
     checkpoints = find_checkpoints(args.ckpt_dir)
+    checkpoints = [(s, p) for s, p in checkpoints if s % args.step_interval == 0]
     if not checkpoints:
         print(f"No checkpoints found in {args.ckpt_dir}")
         return

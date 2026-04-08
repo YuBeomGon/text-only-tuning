@@ -1,0 +1,14 @@
+{
+  "model_name": "openai/whisper-large-v3-turbo",
+  "e_pretrained_path": "priors/e_pretrained_v1.pt",
+  "text_file": "data/train/domain_text.txt",
+  "output_dir": "priors/train_run_002",
+  "max_steps": 1000,
+  "save_every": 50,
+  "batch_size": 8,
+  "lr": 3e-05,
+  "warmup_steps": 50,
+  "scheduler": "cosine",
+  "grad_clip": 1.0,
+  "language": "ko"
+}
