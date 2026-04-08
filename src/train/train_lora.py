@@ -1,8 +1,11 @@
-"""LoRA-based decoder fine-tuning with text-only data.
+"""Joint B + LoRA decoder fine-tuning with text-only data.
 
-Adds LoRA adapters to decoder cross-attention (q_proj, v_proj) while keeping
-all original weights frozen.  The encoder is never run; a pre-computed
-E_pretrained tensor is fed as encoder_hidden_states.
+Trains two parameter groups simultaneously:
+  - B (nn.Parameter): encoder-output bias, initialised from E_pretrained.
+  - LoRA adapters on decoder cross-attention (q_proj, v_proj).
+
+The encoder is never run; B is expanded per-batch and injected as
+encoder_outputs.  An EMA copy of B is maintained for checkpointing.
 
 Usage:
     python -m src.train.train_lora --config configs/train_lora_v1.yaml
@@ -20,6 +23,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from transformers import WhisperForConditionalGeneration
+from transformers.modeling_outputs import BaseModelOutput
 from peft import LoraConfig, get_peft_model
 
 from src.train.dataset import DomainTextDataset
@@ -98,6 +102,7 @@ def train(
     lora_alpha: int = 16,
     lora_dropout: float = 0.05,
     target_modules: list[str] | None = None,
+    ema_decay: float = 1.0,
     language: str = "ko",
     device: str = "cuda",
 ):
@@ -131,11 +136,13 @@ def train(
     model.print_trainable_parameters()
 
     # ------------------------------------------------------------------
-    # 3. Load E_pretrained (frozen encoder output, reused every step)
+    # 3. Create trainable B from E_pretrained + EMA copy
     # ------------------------------------------------------------------
     e_pretrained = torch.load(
         e_pretrained_path, map_location=device, weights_only=True,
     ).squeeze(0).float()  # (seq_len, d_model)
+    B = nn.Parameter(e_pretrained.clone())
+    B_ema = e_pretrained.clone()  # not a Parameter, no grad
 
     # ------------------------------------------------------------------
     # 4. Dataset & dataloader
@@ -147,9 +154,10 @@ def train(
     )
 
     # ------------------------------------------------------------------
-    # 5. Optimizer & scheduler (LoRA params only)
+    # 5. Optimizer & scheduler (LoRA params + B)
     # ------------------------------------------------------------------
-    trainable_params = [p for p in model.parameters() if p.requires_grad]
+    lora_params = [p for p in model.parameters() if p.requires_grad]
+    trainable_params = lora_params + [B]
     optimizer = torch.optim.AdamW(trainable_params, lr=lr)
     lr_scheduler = None
     if scheduler == "cosine":
@@ -176,20 +184,16 @@ def train(
         labels = batch["labels"].to(device)
         bsz = decoder_input_ids.shape[0]
 
-        encoder_hidden_states = e_pretrained.unsqueeze(0).expand(bsz, -1, -1)
+        encoder_hidden_states = B.unsqueeze(0).expand(bsz, -1, -1)
+        encoder_outputs = BaseModelOutput(last_hidden_state=encoder_hidden_states)
 
-        # Forward through the full model.
-        # PEFT wraps the decoder so LoRA adapters are applied automatically.
-        # We pass encoder_outputs as a tuple to skip the encoder forward pass
-        # and directly inject our pre-computed encoder_hidden_states.
-        # NOTE: If PEFT's seq2seq wrapper does not correctly route
-        # encoder_outputs, we may need to call
-        #   model.base_model.model.model.decoder(...)
-        # and then model.base_model.model.proj_out(...) manually.
-        # Start with the simplest approach first.
+        # Forward through the PEFT-wrapped model.
+        # LoRA adapters are applied automatically to the decoder.
+        # We pass encoder_outputs to skip the encoder forward pass
+        # and inject B as the encoder hidden states.
         outputs = model(
             decoder_input_ids=decoder_input_ids,
-            encoder_outputs=(encoder_hidden_states,),
+            encoder_outputs=encoder_outputs,
             labels=None,  # compute loss manually for clarity
         )
         logits = outputs.logits
@@ -204,32 +208,41 @@ def train(
         if lr_scheduler is not None:
             lr_scheduler.step()
 
+        # Update EMA of B
+        with torch.no_grad():
+            B_ema.mul_(ema_decay).add_(B.data, alpha=1.0 - ema_decay)
+
         step += 1
 
         # Logging
         if step % log_every == 0:
             current_lr = optimizer.param_groups[0]["lr"]
+            ema_diff = (B.data - B_ema).norm().item()
             record = {
                 "step": step,
                 "loss": loss.item(),
                 "lr": current_lr,
+                "ema_diff_norm": ema_diff,
             }
             log_records.append(record)
             print(
                 f"step={step} loss={loss.item():.4f} lr={current_lr:.2e}"
+                f" ema_diff={ema_diff:.4f}"
             )
 
-        # Checkpoint (saves only LoRA adapter weights)
+        # Checkpoint (LoRA adapter + B)
         if step % save_every == 0:
             ckpt_dir = output_path / f"step_{step}"
             model.save_pretrained(ckpt_dir)
+            torch.save(B_ema.unsqueeze(0), ckpt_dir / "B.pt")
             print(f"  checkpoint saved to {ckpt_dir}")
 
     # ------------------------------------------------------------------
-    # 7. Save final adapter, log, and config
+    # 7. Save final adapter + B, log, and config
     # ------------------------------------------------------------------
     model.save_pretrained(output_path)
-    print(f"Final LoRA adapter saved to {output_path}")
+    torch.save(B_ema.unsqueeze(0), output_path / "B.pt")
+    print(f"Final LoRA adapter + B saved to {output_path}")
 
     log_path = output_path / "train_log.json"
     with open(log_path, "w", encoding="utf-8") as f:
@@ -249,6 +262,7 @@ def train(
         "warmup_steps": warmup_steps,
         "scheduler": scheduler,
         "grad_clip": grad_clip,
+        "ema_decay": ema_decay,
         "lora_r": lora_r,
         "lora_alpha": lora_alpha,
         "lora_dropout": lora_dropout,
@@ -289,6 +303,7 @@ def main():
     parser.add_argument("--lora_alpha", type=int, default=None)
     parser.add_argument("--lora_dropout", type=float, default=None)
     parser.add_argument("--target_modules", nargs="+", default=None)
+    parser.add_argument("--ema_decay", type=float, default=None)
     parser.add_argument("--language", default=None)
     parser.add_argument("--device", default=None)
     args = parser.parse_args()

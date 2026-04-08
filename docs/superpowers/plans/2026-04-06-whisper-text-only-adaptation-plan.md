@@ -1583,8 +1583,30 @@ git commit -m "test: add integration smoke test with minimal fixtures"
 ### 결론
 단일 고정 B를 encoder_output에 보간하는 방식은 utterance-specific representation을 만들 수 없어 한계. 논문은 decoder도 함께 fine-tune한 것으로 판단되며, B-only training은 insufficient.
 
-### 전환 방향: LoRA adapter
-- decoder cross-attention에 LoRA adapter 추가 (rank=8, PEFT)
-- B 보간 불필요 — LoRA decoder가 직접 도메인 패턴 학습
+### 전환 방향: B + LoRA 동시 학습 (co-training)
+
+논문 재검토 결과, B만 단독 학습하거나 LoRA만 단독 학습하는 것이 아니라 **B와 decoder를 동시에 학습**해야 한다.
+
+**논문의 학습 구조:**
+- Encoder: 고정 (frozen)
+- B (bias embeddings): trainable, E_pretrained으로 초기화
+- Decoder: fine-tuned (우리는 LoRA adapter로 대체)
+- W_g, W_r: trainable (MoE gating, 우리는 미사용)
+- 모든 trainable 파라미터가 **동시에 학습**됨
+
+**우리의 수정된 학습 구조:**
+- Encoder: 고정
+- B: nn.Parameter, E_pretrained으로 초기화, 학습
+- Decoder: base weights 고정, LoRA adapter (q_proj, v_proj) 학습
+- B와 LoRA가 **동시에 co-adapt** — B는 도메인 representation을 학습하고, LoRA decoder는 그 representation에서 디코딩하는 법을 동시에 학습
+- 추론 시: alpha * encoder_output + (1-alpha) * B(trained) → LoRA decoder
+
+**LoRA 단독 학습의 문제점 (train/test mismatch):**
+- 학습 시: decoder가 E_pretrained(원본 encoder output)으로부터 디코딩 학습
+- 추론 시: decoder가 alpha * encoder_output + (1-alpha) * B 보간 결과로부터 디코딩
+- 학습과 추론의 입력 분포가 달라 성능 저하 예상
+
+**적용 사항:**
+- B + LoRA(rank=8, decoder cross-attention q_proj/v_proj) 동시 학습 (PEFT)
 - 기존 harness/eval 인프라 재활용
 - 주의: PEFT seq2seq의 음성 입력 미지원 → 오버라이딩 필요

@@ -68,11 +68,20 @@ B 보간 방식의 구조적 한계 확인 완료. LoRA adapter 기반 decoder f
 - 기존 harness(score.sh, registry, sweep)는 그대로 활용
 
 ## Next 3 actions
-1. **LoRA 학습 스크립트 작성** — PEFT LoraConfig + 음성 입력 오버라이딩
-2. **LoRA 추론 파이프라인 수정** — base model + adapter 로드, B 보간 제거
-3. **LoRA train_run_001 실행** — rank=8, decoder cross-attention target, 도메인 텍스트 2,437줄
+1. **B+LoRA 동시 학습 스크립트 작성** — B(nn.Parameter, E_pretrained 초기화) + LoRA(q_proj, v_proj) 동시 학습, 음성 입력 오버라이딩
+2. **B+LoRA 추론 파이프라인 수정** — alpha * encoder_output + (1-alpha) * B(trained) → LoRA decoder로 디코딩
+3. **B+LoRA train_run_001 실행** — rank=8, decoder cross-attention target, 도메인 텍스트 2,437줄
+
+### LoRA 단독 접근이 아닌 B+LoRA 동시 학습인 이유
+- 논문의 학습 구조: encoder 고정, B + decoder가 **동시에 학습** (W_g, W_r 포함)
+- LoRA 단독 학습 시 train/test mismatch 발생:
+  - 학습: decoder가 E_pretrained(원본 encoder output)으로부터 디코딩 학습
+  - 추론: decoder가 alpha * encoder_output + (1-alpha) * B 보간 결과로부터 디코딩
+  - 학습과 추론의 입력 분포가 달라 성능 저하 예상
+- B+LoRA 동시 학습: B는 도메인 representation을 학습하고, LoRA decoder는 그 representation에서 디코딩하는 법을 동시에 학습 (co-adaptation)
 
 ## Open risks
+- B+LoRA 동시 학습 시 학습 불안정성 (B gradient와 LoRA gradient 간 상호작용)
 - LoRA fine-tune 시 일반화 성능 저하 가능 (catastrophic forgetting)
 - PEFT seq2seq 음성 입력 오버라이딩 복잡도
 - rank 선택에 따른 성능/일반화 trade-off
