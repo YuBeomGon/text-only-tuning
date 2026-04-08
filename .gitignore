@@ -7,6 +7,9 @@ data/*
 priors/*.pt
 priors/**/*.pt
 
+# LoRA adapter weights
+lora/
+
 # Experiment outputs
 experiments/outputs/
 
