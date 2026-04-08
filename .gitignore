@@ -1,6 +1,7 @@
-# Data (sensitive)
-data/
-!data/.gitkeep
+# Data (sensitive - audio, manifests, raw corpus)
+data/*
+!data/train/
+!data/lexicon/
 
 # Model weights & priors
 priors/*.pt
