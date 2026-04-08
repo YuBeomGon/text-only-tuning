@@ -1564,3 +1564,27 @@ git commit -m "test: add integration smoke test with minimal fixtures"
    - [x] I4: run_eval.py uses corpus-level jiwer_cer/jiwer_wer (Task 7)
    - [x] I5: HUMAN_REVIEW checked before PASS/REPRO_REQUIRED with all safety metrics (Task 8)
    - [x] M3: test count corrected to 7 (Task 1)
+
+---
+
+## Phase 전환: B 보간 → LoRA (2026-04-08)
+
+### B 보간 실험 결과 요약
+
+| run | 데이터 | 설정 | best CER (α=0.9) | baseline 대비 |
+|-----|--------|------|-------------------|--------------|
+| train_run_002 | 306줄 | CE, no EMA | 0.1577 | +22.7% |
+| train_run_003 | 2,437줄 | CE, EMA 0.99 | 0.1519 | +18.2% |
+
+- 데이터 8배 증가 + EMA 적용해도 baseline(0.1285) 미달
+- α=0.7 이하에서 decoder 붕괴 (CER 2.3~2.5)
+- step 50~5000까지 결과 거의 동일 → 구조적 한계
+
+### 결론
+단일 고정 B를 encoder_output에 보간하는 방식은 utterance-specific representation을 만들 수 없어 한계. 논문은 decoder도 함께 fine-tune한 것으로 판단되며, B-only training은 insufficient.
+
+### 전환 방향: LoRA adapter
+- decoder cross-attention에 LoRA adapter 추가 (rank=8, PEFT)
+- B 보간 불필요 — LoRA decoder가 직접 도메인 패턴 학습
+- 기존 harness/eval 인프라 재활용
+- 주의: PEFT seq2seq의 음성 입력 미지원 → 오버라이딩 필요
